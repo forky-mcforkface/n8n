@@ -147,6 +147,10 @@ interface PendingResponseMetric {
 	isFirstUserMessage: boolean;
 	actionSource: InstanceAiThreadSourcePersisted;
 	generation: number;
+	// Context of the message that started the run, repeated on the response event
+	// so outcome cuts by context need no join back to the send event.
+	mentionCounts: AssistantMentionCounts;
+	attachmentCount: number;
 }
 
 /**
@@ -719,6 +723,11 @@ export function createThreadRuntime(
 				response_kind: signal.responseKind,
 				action_source: metric.actionSource,
 				tab_visible: tabVisible,
+				mention_count: metric.mentionCounts.mentionCount,
+				workflow_mention_count: metric.mentionCounts.workflowMentionCount,
+				node_mention_count: metric.mentionCounts.nodeMentionCount,
+				group_mention_count: metric.mentionCounts.groupMentionCount,
+				attachment_count: metric.attachmentCount,
 			});
 		});
 	}
@@ -1631,12 +1640,13 @@ export function createThreadRuntime(
 			const isFirstMessage = !messages.value.some((m) => m.role === 'user');
 			const actionSource = resolveActionSource();
 			const optimistic = pushOptimisticUserMessage(message, attachments, handoffContext);
+			const attachmentCount = attachments?.length ?? 0;
 			trackUserMessageSent(
 				isFirstMessage,
 				authorship,
 				actionSource,
 				mentionCounts,
-				attachments?.length ?? 0,
+				attachmentCount,
 			);
 
 			const runId = await dispatchUserMessage(message, attachments, handoffContext, pushRef);
@@ -1651,6 +1661,8 @@ export function createThreadRuntime(
 				isFirstUserMessage: isFirstMessage,
 				actionSource,
 				generation: metricGeneration,
+				mentionCounts,
+				attachmentCount,
 			});
 			return true;
 		} finally {
